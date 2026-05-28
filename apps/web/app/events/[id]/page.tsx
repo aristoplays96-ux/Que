@@ -263,6 +263,8 @@ export default function PublicEventPage({ params }: { params: Promise<{ id: stri
 				) : event.type === "banter" ? (
 					<BanterEventLayout
 						eventId={id}
+						eventTitle={event.title}
+						theme={event.theme}
 						chatItems={chatItems}
 						questionItems={questionItems}
 						answers={answers}
@@ -286,6 +288,7 @@ export default function PublicEventPage({ params }: { params: Promise<{ id: stri
 						eventTitle={event.title}
 						eventDescription={event.description || undefined}
 						eventType={event.type === "poll" ? "poll" : "form"}
+						theme={event.theme}
 						questionItems={questionItems}
 						answers={answers}
 						submitted={submitted}

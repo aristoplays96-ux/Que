@@ -5,11 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/com
 import { Button } from "~/components/ui/button";
 import { QuestionRenderer } from "./question-renderer";
 import { CheckCircleIcon } from "lucide-react";
+import { useTheme } from "~/hooks/use-theme";
 
 interface FormEventLayoutProps {
 	eventTitle: string;
 	eventDescription?: string;
 	eventType: "form" | "poll";
+	theme?: string | null;
 	questionItems: any[];
 	answers: Record<string, string[]>;
 	submitted: boolean;
@@ -23,6 +25,7 @@ export function FormEventLayout({
 	eventTitle,
 	eventDescription,
 	eventType,
+	theme,
 	questionItems,
 	answers,
 	submitted,
@@ -31,6 +34,8 @@ export function FormEventLayout({
 	onAnswerChange,
 	onFormSubmit,
 }: FormEventLayoutProps) {
+	const parsedTheme = useTheme(theme);
+	const isImageBackground = parsedTheme.type === "image";
 	if (submitted) {
 		return (
 			<Card className="shadow-xl border-border bg-card/90 backdrop-blur-md">
@@ -55,7 +60,15 @@ export function FormEventLayout({
 			: 0;
 
 	return (
-		<form onSubmit={onFormSubmit} className="space-y-6">
+		<div
+			style={parsedTheme.wrapperStyle}
+			className={`w-full transition-all duration-300 ${parsedTheme.wrapperClass}`}
+		>
+			{isImageBackground && (
+				<div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] pointer-events-none" />
+			)}
+			<div className={`p-4 md:p-6 ${isImageBackground ? "relative z-10" : ""}`}>
+				<form onSubmit={onFormSubmit} className="space-y-6">
 			<Card className="shadow-xl border-border bg-card/90 backdrop-blur-md">
 				<CardHeader className="border-b bg-muted/40 p-4 pb-3">
 					<CardTitle className="text-lg">{eventTitle}</CardTitle>
@@ -116,6 +129,8 @@ export function FormEventLayout({
 					</Button>
 				</div>
 			)}
-		</form>
+			</form>
+		</div>
+		</div>
 	);
 }
