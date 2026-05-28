@@ -6,16 +6,16 @@ import { useCreateResponse } from "~/hooks/use-create-response";
 import { useCreateItem } from "~/hooks/use-create-item";
 import { useCreateParticipant } from "~/hooks/use-create-participant";
 import { useSocket } from "~/hooks/use-socket";
-import { QuestionRenderer } from "~/components/features/question-renderer";
+import { BanterEventLayout } from "~/components/features/banter-event-layout";
+import { FormEventLayout } from "~/components/features/form-event-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { LoadingSpinner } from "~/components/shared/loading-spinner";
 import { toast } from "sonner";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useParticipants } from "~/hooks/use-participants";
-import { SendIcon, UsersIcon, CheckCircleIcon, ArrowLeftIcon } from "lucide-react";
+import { CheckCircleIcon, ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 
 export default function PublicEventPage({ params }: { params: Promise<{ id: string }> }) {
@@ -63,15 +63,6 @@ export default function PublicEventPage({ params }: { params: Promise<{ id: stri
 	const [chatMessage, setChatMessage] = useState("");
 	const [submitted, setSubmitted] = useState(false);
 	const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-	
-	const chatBottomRef = useRef<HTMLDivElement | null>(null);
-
-	// Auto scroll banter room to bottom on new messages
-	useEffect(() => {
-		if (event?.type === "banter") {
-			chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-		}
-	}, [items, event?.type]);
 
 	// Join event participant session
 	const handleJoinEvent = async (e: React.FormEvent) => {
@@ -129,8 +120,11 @@ export default function PublicEventPage({ params }: { params: Promise<{ id: stri
 				})),
 			});
 			setSubmitted(true);
+			toast.success("Response submitted successfully!");
 		} catch (err) {
 			console.error("Submission failed", err);
+			toast.error("Failed to submit response");
+			updateStatus("idle");
 		}
 	};
 
@@ -158,7 +152,6 @@ export default function PublicEventPage({ params }: { params: Promise<{ id: stri
 	// Track when user is typing to update presence status in real time
 	const handleInputChange = (itemId: string, val: string[]) => {
 		setAnswers((prev) => ({ ...prev, [itemId]: val }));
-		updateStatus("filling");
 	};
 
 	const handleChatTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,9 +163,13 @@ export default function PublicEventPage({ params }: { params: Promise<{ id: stri
 		}
 	};
 
-	if (!isMounted || isLoadingEvent) {
+	if (!isMounted) {
+		return null;
+	}
+
+	if (isLoadingEvent) {
 		return (
-			<div className="flex h-screen items-center justify-center bg-background" suppressHydrationWarning={true}>
+			<div className="flex h-screen items-center justify-center bg-background">
 				<LoadingSpinner />
 			</div>
 		);
@@ -180,90 +177,70 @@ export default function PublicEventPage({ params }: { params: Promise<{ id: stri
 
 	if (!event) {
 		return (
-			<div className="container max-w-md py-24 bg-background">
+			<div className="flex h-screen items-center justify-center bg-background">
 				<Card>
 					<CardContent className="pt-6 text-center space-y-4">
 						<p className="text-destructive font-semibold">Event Not Found</p>
 						<p className="text-sm text-muted-foreground">The event link is invalid or has expired.</p>
+						<Link href="/events">
+							<Button variant="outline" size="sm">
+								<ArrowLeftIcon className="size-4 mr-2" />
+								Back to Events
+							</Button>
+						</Link>
 					</CardContent>
 				</Card>
 			</div>
 		);
 	}
 
-	// Dynamic Background Theme configuration
-	const hasImgBackground = event.theme?.startsWith("image:");
-	const bgImgUrl = hasImgBackground ? event.theme?.replace("image:", "") : "";
-	const hasClassBackground = event.theme?.startsWith("class:");
-	const bgClass = hasClassBackground ? event.theme?.replace("class:", "") : "";
-
-	const wrapperStyle: React.CSSProperties = hasImgBackground
-		? {
-				backgroundImage: `url(${bgImgUrl})`,
-				backgroundSize: "cover",
-				backgroundPosition: "center",
-				backgroundAttachment: "fixed",
-		  }
-		: {};
-
-	const wrapperClass = `min-h-screen w-full relative flex flex-col justify-start transition-all duration-300 ${
-		hasClassBackground ? bgClass : "bg-background text-foreground"
-	}`;
-
-	// Step 1: Force joining alias to participate (Banter sessions only)
-	if (event.type === "banter" && !isJoined) {
+	// Step 1: Force joining alias to participate
+	if (!isJoined) {
 		return (
-			<div style={wrapperStyle} className={wrapperClass}>
-				{hasImgBackground && <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px] pointer-events-none" />}
-				<div className="container max-w-md min-h-screen flex items-center justify-center py-12 relative z-10">
-					<Card className="w-full shadow-xl border-border bg-card/90 backdrop-blur-md">
-						<CardHeader className="text-center">
-							<CardTitle>{event.title}</CardTitle>
-							<CardDescription>{event.description || "Enter your nickname to join the banter room"}</CardDescription>
-						</CardHeader>
-						<CardContent>
-							<form onSubmit={handleJoinEvent} className="space-y-4">
-								<div className="space-y-2">
-									<Input
-										placeholder="Choose a cool alias/nickname..."
-										value={alias}
-										onChange={(e) => setAlias(e.target.value)}
-										maxLength={30}
-										className="bg-background/80"
-									/>
-								</div>
-								<Button type="submit" className="w-full font-semibold" disabled={createParticipant.isLoading}>
-									{createParticipant.isLoading ? "Joining room..." : "Join Banter Room"}
-								</Button>
-							</form>
-						</CardContent>
-					</Card>
-				</div>
+			<div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex items-center justify-center p-4">
+				<Card className="w-full max-w-md shadow-xl border-border bg-card/90 backdrop-blur-md">
+					<CardHeader className="text-center">
+						<CardTitle className="text-2xl">{event.title}</CardTitle>
+						<CardDescription className="mt-2">{event.description || "Enter your nickname to participate"}</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<form onSubmit={handleJoinEvent} className="space-y-4">
+							<Input
+								placeholder="Enter your nickname or alias"
+								value={alias}
+								onChange={(e) => setAlias(e.target.value)}
+								maxLength={30}
+								autoFocus
+							/>
+							<Button type="submit" className="w-full" disabled={createParticipant.isLoading}>
+								{createParticipant.isLoading ? "Joining..." : `Join ${event.type === "banter" ? "Chat Room" : event.type === "poll" ? "Poll" : "Form"}`}
+							</Button>
+						</form>
+					</CardContent>
+				</Card>
 			</div>
 		);
 	}
 
-	// Step 2: Show success after response recorded
-	if (submitted) {
+	// Step 2: Show success after response recorded (for forms/polls only)
+	if (submitted && event.type !== "banter") {
 		return (
-			<div style={wrapperStyle} className={wrapperClass}>
-				{hasImgBackground && <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px] pointer-events-none" />}
-				<div className="container max-w-md min-h-screen flex items-center justify-center py-12 relative z-10">
-					<Card className="w-full text-center shadow-xl border-border bg-card/90 backdrop-blur-md">
-						<CardContent className="pt-12 pb-12 space-y-5">
-							<CheckCircleIcon className="size-16 text-emerald-500 mx-auto animate-bounce" />
-							<h2 className="text-2xl font-bold">Response Recorded!</h2>
-							<p className="text-muted-foreground text-sm">Thank you for participating in {event.title}. Your feedback has been safely logged.</p>
-							<div className="pt-2">
-								<Link href="/">
-									<Button variant="outline" size="sm" className="gap-2">
-										<ArrowLeftIcon className="size-4" /> Go to home
-									</Button>
-								</Link>
-							</div>
-						</CardContent>
-					</Card>
-				</div>
+			<div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex items-center justify-center p-4">
+				<Card className="w-full max-w-md text-center shadow-xl border-border bg-card/90 backdrop-blur-md">
+					<CardContent className="pt-12 pb-12 space-y-5">
+						<div className="p-3 bg-emerald-500/10 dark:bg-emerald-950/20 rounded-full w-fit mx-auto">
+							<CheckCircleIcon className="size-16 text-emerald-600 dark:text-emerald-400" />
+						</div>
+						<h2 className="text-2xl font-bold">Thank You!</h2>
+						<p className="text-muted-foreground text-sm">Your response has been recorded. We appreciate your participation!</p>
+						<Link href="/events">
+							<Button variant="outline" size="sm" className="gap-2">
+								<ArrowLeftIcon className="size-4" />
+								Back to Events
+							</Button>
+						</Link>
+					</CardContent>
+				</Card>
 			</div>
 		);
 	}
@@ -272,113 +249,51 @@ export default function PublicEventPage({ params }: { params: Promise<{ id: stri
 	const chatItems = (items ?? []).filter((i) => i.category === "chat");
 
 	return (
-		<div style={wrapperStyle} className={wrapperClass}>
-			{hasImgBackground && <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px] pointer-events-none" />}
-			
-			<div className="container max-w-3xl py-12 space-y-6 relative z-10">
-				{/* Real-time Header */}
-				<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border/40 pb-6">
-					<div>
-						<h1 className="text-3xl font-extrabold tracking-tight">{event.title}</h1>
-						<p className="text-sm text-muted-foreground mt-1.5">{event.description}</p>
-					</div>
-					<div className="flex items-center gap-3">
-						{isConnected ? (
-							<div className="flex items-center gap-2 bg-emerald-500/10 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-xs px-3.5 py-2 rounded-full border border-emerald-500/20 shadow-sm backdrop-blur-md">
-								<span className="relative flex h-2 w-2">
-									<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-									<span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-								</span>
-								<span className="font-semibold">{onlineCount} online</span>
-							</div>
-						) : (
-							<div className="bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs px-3.5 py-2 rounded-full border border-amber-500/20 shadow-sm backdrop-blur-md">
-								Offline Mode {isFallbackActive && "(Polling active)"}
-							</div>
-						)}
-					</div>
-				</div>
+		<div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+			<div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+				<Link href="/events" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+					<ArrowLeftIcon className="size-4" />
+					Back to Events
+				</Link>
 
-				{/* Event Forms or Banter Layout */}
-				{event.type === "banter" ? (
-					<Card className="h-[550px] flex flex-col shadow-xl border-border bg-card/85 backdrop-blur-md">
-						<CardHeader className="border-b bg-muted/40 p-4">
-							<CardTitle className="text-base flex items-center gap-2">
-								<UsersIcon className="size-4 text-primary animate-pulse" /> Banter Chat Room
-							</CardTitle>
-						</CardHeader>
-						<CardContent className="flex-1 overflow-y-auto p-4 space-y-3 bg-background/30">
-							{chatItems.length === 0 ? (
-								<div className="text-center text-muted-foreground py-20 text-sm italic">
-									No messages yet. Send a message to spark the banter!
-								</div>
-							) : (
-								chatItems.map((msg) => {
-									const senderAlias = msg.participantId ? participantMap[msg.participantId] : undefined;
-									return (
-										<div key={msg.id} className="flex items-start gap-2.5">
-											<Avatar className="size-8 border shadow-sm">
-												<AvatarFallback className="text-[10px] font-bold bg-primary/10 text-primary">
-													{senderAlias?.substring(0, 2).toUpperCase() || "PT"}
-												</AvatarFallback>
-											</Avatar>
-											<div className="flex flex-col bg-card border rounded-2xl px-3.5 py-2 max-w-[80%] text-sm shadow-sm">
-												<span className="font-bold text-[10px] text-primary tracking-wide uppercase">
-													{senderAlias || "Anonymous"}
-												</span>
-												<p className="mt-0.5 break-words font-medium text-foreground">{msg.value}</p>
-											</div>
-										</div>
-									);
-								})
-							)}
-							<div ref={chatBottomRef} />
-						</CardContent>
-						<div className="p-3 border-t bg-muted/30">
-							{/* Typing Indicator */}
-							{Object.entries(participantStatuses).some(([pid, status]) => pid !== participantId && status === "typing") && (
-								<p className="text-[11px] text-muted-foreground italic mb-2 animate-pulse pl-1">Someone is typing...</p>
-							)}
-							<form onSubmit={handleSendChatMessage} className="flex gap-2">
-								<Input
-									placeholder="Say something nice..."
-									value={chatMessage}
-									onChange={handleChatTyping}
-									className="flex-1 bg-background/90"
-								/>
-								<Button type="submit" size="icon" disabled={!chatMessage.trim()} className="shadow-md">
-									<SendIcon className="size-4" />
-								</Button>
-							</form>
-						</div>
-					</Card>
+				{isLoadingItems ? (
+					<div className="flex items-center justify-center py-12">
+						<LoadingSpinner />
+					</div>
+				) : event.type === "banter" ? (
+					<BanterEventLayout
+						eventId={id}
+						chatItems={chatItems}
+						questionItems={questionItems}
+						answers={answers}
+						participantId={participantId}
+						participantMap={participantMap}
+						participantStatuses={participantStatuses}
+						onlineCount={onlineCount}
+						isConnected={isConnected}
+						isFallbackActive={isFallbackActive}
+						chatMessage={chatMessage}
+						formErrors={formErrors}
+						onChatMessageChange={setChatMessage}
+						onChatTyping={handleChatTyping}
+						onSendChatMessage={handleSendChatMessage}
+						onAnswerChange={handleInputChange}
+						onFormSubmit={handleFormSubmit}
+						onStatusUpdate={updateStatus}
+					/>
 				) : (
-					<form onSubmit={handleFormSubmit} className="space-y-6">
-						<Card className="shadow-xl border-border bg-card/90 backdrop-blur-md">
-							<CardContent className="pt-6 space-y-6">
-								{questionItems.length === 0 ? (
-									<p className="text-center text-muted-foreground py-12 text-sm italic">
-										No questions added yet to this event.
-									</p>
-								) : (
-									questionItems.map((item) => (
-										<QuestionRenderer
-											key={item.id}
-											item={item}
-											answer={answers[item.id] ?? []}
-											onChange={(val) => handleInputChange(item.id, val)}
-											error={formErrors[item.id]}
-										/>
-									))
-								)}
-							</CardContent>
-						</Card>
-						{questionItems.length > 0 && (
-							<Button type="submit" className="w-full h-11 text-sm font-semibold tracking-wide shadow-lg hover:shadow-xl transition-all" disabled={createResponse.isLoading}>
-								{createResponse.isLoading ? "Submitting Answers..." : "Submit Response"}
-							</Button>
-						)}
-					</form>
+					<FormEventLayout
+						eventTitle={event.title}
+						eventDescription={event.description || undefined}
+						eventType={event.type === "poll" ? "poll" : "form"}
+						questionItems={questionItems}
+						answers={answers}
+						submitted={submitted}
+						formErrors={formErrors}
+						isSubmitting={createResponse.isLoading}
+						onAnswerChange={handleInputChange}
+						onFormSubmit={handleFormSubmit}
+					/>
 				)}
 			</div>
 		</div>
