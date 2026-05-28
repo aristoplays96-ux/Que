@@ -12,6 +12,7 @@ import { useDeleteEvent } from "~/hooks/use-delete-event";
 import { EventCard } from "./event-card";
 import { LoadingSpinner } from "~/components/shared/loading-spinner";
 import { EmptyState } from "~/components/shared/empty-state";
+import { KanbanBoard } from "~/components/dashboard/kanban-board";
 import type { EventType, EventStatus } from "@repo/trpc/server/modules/events";
 
 interface EventListProps {
@@ -23,6 +24,7 @@ export function EventList({ onCreateClick }: EventListProps) {
 	const [typeFilter, setTypeFilter] = useState<EventType | "all">("all");
 	const [statusFilter, setStatusFilter] = useState<EventStatus | "all">("all");
 	const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
+	const [viewMode, setViewMode] = useState<"kanban" | "grid">("kanban");
 
 	const { data, isLoading, isError, error } = useEvents({
 		type: typeFilter === "all" ? undefined : typeFilter,
@@ -59,6 +61,65 @@ export function EventList({ onCreateClick }: EventListProps) {
 			</Card>
 		);
 	}
+
+	if (filteredEvents.length === 0) {
+		return (
+			<div className="space-y-4">
+				<div className="flex flex-col sm:flex-row gap-4">
+					<div className="relative flex-1">
+						<SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+						<Input
+							placeholder="Search events by title..."
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							className="pl-9"
+						/>
+					</div>
+					<Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as EventType | "all")}>
+						<SelectTrigger className="w-full sm:w-[150px]">
+							<SelectValue placeholder="Type" />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="all">All Types</SelectItem>
+							<SelectItem value="form">Form</SelectItem>
+							<SelectItem value="poll">Poll</SelectItem>
+							<SelectItem value="banter">Banter</SelectItem>
+						</SelectContent>
+					</Select>
+					<Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as EventStatus | "all")}>
+						<SelectTrigger className="w-full sm:w-[150px]">
+							<SelectValue placeholder="Status" />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="all">All Status</SelectItem>
+							<SelectItem value="draft">Draft</SelectItem>
+							<SelectItem value="published">Published</SelectItem>
+							<SelectItem value="archived">Archived</SelectItem>
+							<SelectItem value="completed">Completed</SelectItem>
+						</SelectContent>
+					</Select>
+					{onCreateClick && (
+						<Button onClick={onCreateClick} className="shrink-0">
+							<PlusIcon className="size-4" />
+							Create Event
+						</Button>
+					)}
+				</div>
+
+				<EmptyState
+					title="No events found"
+					description={searchQuery ? "Try adjusting your search or filters" : "Get started by creating your first event"}
+					action={onCreateClick ? { label: "Create Event", onClick: onCreateClick } : undefined}
+				/>
+			</div>
+		);
+	}
+
+	// Group events by status for kanban view
+	const draftEvents = filteredEvents.filter((e) => e.status === "draft");
+	const publishedEvents = filteredEvents.filter((e) => e.status === "published");
+	const completedEvents = filteredEvents.filter((e) => e.status === "completed");
+	const archivedEvents = filteredEvents.filter((e) => e.status === "archived");
 
 	return (
 		<div className="space-y-4">
@@ -103,11 +164,94 @@ export function EventList({ onCreateClick }: EventListProps) {
 				)}
 			</div>
 
-			{filteredEvents.length === 0 ? (
-				<EmptyState
-					title="No events found"
-					description={searchQuery ? "Try adjusting your search or filters" : "Get started by creating your first event"}
-					action={onCreateClick ? { label: "Create Event", onClick: onCreateClick } : undefined}
+			{viewMode === "kanban" ? (
+				<KanbanBoard
+					columns={[
+						{
+							id: "draft",
+							title: "Draft",
+							description: "In development",
+							count: draftEvents.length,
+							items: (
+								<div className="space-y-2">
+									{draftEvents.length === 0 ? (
+										<p className="text-xs text-muted-foreground italic">No draft events</p>
+									) : (
+										draftEvents.map((event) => (
+											<EventCard
+												key={event.id}
+												event={event}
+												onDelete={() => setDeleteEventId(event.id)}
+											/>
+										))
+									)}
+								</div>
+							),
+						},
+						{
+							id: "published",
+							title: "Published",
+							description: "Live & collecting responses",
+							count: publishedEvents.length,
+							items: (
+								<div className="space-y-2">
+									{publishedEvents.length === 0 ? (
+										<p className="text-xs text-muted-foreground italic">No published events</p>
+									) : (
+										publishedEvents.map((event) => (
+											<EventCard
+												key={event.id}
+												event={event}
+												onDelete={() => setDeleteEventId(event.id)}
+											/>
+										))
+									)}
+								</div>
+							),
+						},
+						{
+							id: "completed",
+							title: "Completed",
+							description: "Collection ended",
+							count: completedEvents.length,
+							items: (
+								<div className="space-y-2">
+									{completedEvents.length === 0 ? (
+										<p className="text-xs text-muted-foreground italic">No completed events</p>
+									) : (
+										completedEvents.map((event) => (
+											<EventCard
+												key={event.id}
+												event={event}
+												onDelete={() => setDeleteEventId(event.id)}
+											/>
+										))
+									)}
+								</div>
+							),
+						},
+						{
+							id: "archived",
+							title: "Archived",
+							description: "Stored for reference",
+							count: archivedEvents.length,
+							items: (
+								<div className="space-y-2">
+									{archivedEvents.length === 0 ? (
+										<p className="text-xs text-muted-foreground italic">No archived events</p>
+									) : (
+										archivedEvents.map((event) => (
+											<EventCard
+												key={event.id}
+												event={event}
+												onDelete={() => setDeleteEventId(event.id)}
+											/>
+										))
+									)}
+								</div>
+							),
+						},
+					]}
 				/>
 			) : (
 				<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

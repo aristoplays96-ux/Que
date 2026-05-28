@@ -33,6 +33,7 @@ import {
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Button } from "~/components/ui/button";
+import { Breadcrumb } from "~/components/shared/breadcrumb";
 
 const navigationItems = [
 	{
@@ -146,8 +147,11 @@ export default function DashboardLayout({
 			</Sidebar>
 
 			<SidebarInset>
-				<header className="flex h-14 items-center gap-2 border-b px-4">
-					{mounted && <SidebarTrigger />}
+				<header className="flex h-16 items-center justify-between border-b px-4 gap-4">
+					<div className="flex items-center gap-2">
+						{mounted && <SidebarTrigger />}
+						<Breadcrumb />
+					</div>
 				</header>
 				<div className="flex flex-1 flex-col gap-4 p-4">{children}</div>
 			</SidebarInset>
